@@ -98,8 +98,8 @@ class AppState(filepath: File = File("")) {
     var index: Int = 0
     var amount: Int = 8
     var bookmark: Int = 0
-    var chapter: Int = 1
-    /*var showMenu: Boolean = false*/
+    var chapter: Int = 0
+    var section = 0
 
     init {
         val s = if (file.exists()) file.readText() else ""
@@ -108,36 +108,36 @@ class AppState(filepath: File = File("")) {
         when (l.size) {
             1 -> {
                 val (f) = l
-                update(f, 0, 8, 0, 1)
+                update(f, 0, 8, 0, 0, 0)
             }
 
             2 -> {
                 val (f, i) = l
-                update(f, i.toInt(), 8, 0, 1)
+                update(f, i.toInt(), 8, 0, 0, 0)
             }
 
             3 -> {
                 val (f, i, a) = l
-                update(f, i.toInt(), a.toInt(), 0, 1)
+                update(f, i.toInt(), a.toInt(), 0, 0, 0)
             }
 
             4 -> {
                 val (f, i, a, b) = l
-                update(f, i.toInt(), a.toInt(), b.toInt(), 1)
+                update(f, i.toInt(), a.toInt(), b.toInt(), 0, 0)
             }
 
             5 -> {
                 val (f, i, a, b, c) = l
-                update(f, i.toInt(), a.toInt(), b.toInt(), c.toInt())
+                update(f, i.toInt(), a.toInt(), b.toInt(), c.toInt(), 0)
             }
 
             6 -> {
-                val (f, i, a, b, c, m) = l
-                update(f, i.toInt(), a.toInt(), b.toInt(), c.toInt() /*m.toBoolean()*/)
+                val (f, i, a, b, c, section) = l
+                update(f, i.toInt(), a.toInt(), b.toInt(), c.toInt(), section.toInt())
             }
 
             else -> {
-                update("book.bk", 0, 8, 0, 1 /*false*/)
+                update("book.bk", 0, 8, 0, 1, 0 )
             }
         }
     }
@@ -152,6 +152,7 @@ class AppState(filepath: File = File("")) {
         amount: Int,
         bookmark: Int,
         chapter: Int,
+        section: Int,
         /*showMenu: Boolean,*/
     ) {
         this.lastbook = lastbook
@@ -159,18 +160,19 @@ class AppState(filepath: File = File("")) {
         this.amount = amount
         this.bookmark = bookmark
         this.chapter = chapter
+        this.section = section
     }
 
     fun validate(): Boolean {
-        return file.readText().split("\u0000").size == 5
+        return file.readText().split("\u0000").size == 6
     }
 
     fun read(): String {
         val s = file.readText()
 
         if (validate()) {
-            val (f, i, a, b, c /*m*/) = s.split("\u0000")
-            update(f, i.toInt(), a.toInt(), b.toInt(), c.toInt() /*m.toBoolean()*/)
+            val (f, i, a, b, c, section /*m*/) = s.split("\u0000")
+            update(f, i.toInt(), a.toInt(), b.toInt(), c.toInt(), section.toInt() /*m.toBoolean()*/)
         }
 
         return s
@@ -181,7 +183,7 @@ class AppState(filepath: File = File("")) {
     }
 
     fun getData(): String {
-        return "$lastbook\u0000$index\u0000$amount\u0000$bookmark\u0000$chapter"
+        return "$lastbook\u0000$index\u0000$amount\u0000$bookmark\u0000$chapter\u0000$section"
     }
 
     override fun toString(): String {
@@ -189,7 +191,8 @@ class AppState(filepath: File = File("")) {
                  |index: $index
                  |amount: $amount
                  |bookmark: $bookmark
-                 |chapter: $chapter""".trimMargin()
+                 |chapter: $chapter
+                 |section: $section""".trimMargin()
     }
 
     operator fun component1() = lastbook
@@ -197,4 +200,5 @@ class AppState(filepath: File = File("")) {
     operator fun component3() = amount
     operator fun component4() = bookmark
     operator fun component5() = chapter
+    operator fun component6() = section
 }

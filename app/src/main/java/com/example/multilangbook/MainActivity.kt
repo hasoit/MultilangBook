@@ -44,7 +44,19 @@ class MainActivity : ComponentActivity() {
         setContent {
 //            fixDataFile()
             app()
+//            testbook()
         }
+    }
+
+    @Composable
+    fun testbook() {
+        val context = LocalContext.current
+
+        val b = Book(context.resources.openRawResource(R.raw.crime_and_punishment).bufferedReader().readText())
+        val x = b.chapters.first().sections.first()
+//        val s = "${x.name.quote()}\n${x.content.quote()}"
+        val s = "${x.list.first()}"
+        Text(s)
     }
 
     @Composable
@@ -80,7 +92,7 @@ class MainActivity : ComponentActivity() {
 
         state.setDatafile(datafile)
         state.read()
-        state.chapter = 2
+        state.chapter = 0
         state.write()
 
         Text(state.toString(), Modifier.padding(64.dp))
@@ -111,33 +123,33 @@ class MainActivity : ComponentActivity() {
         var showflags by remember { mutableStateOf(false) }
         var compare by remember { mutableStateOf(false) }
 
-        var swipe by remember { mutableStateOf(false) }
         var keyhandling by remember { mutableStateOf(false) }
         var showTopButtons by remember { mutableStateOf(false) }
         var pageMode by remember { mutableStateOf(false) }
 
-        val rawBook = context.resources.openRawResource(R.raw.book)
+        val rawBook = context.resources.openRawResource(R.raw.crime_and_punishment)
         val rawBookData = rawBook.bufferedReader().readText()
 
         var book by remember { mutableStateOf(Book(rawBookData)) }
 
         var bookmarkedChapter by remember { mutableStateOf(state.chapter) }
+        var bookmarkedSection by remember { mutableStateOf(state.section) }
         val lastbook by remember { mutableStateOf(state.lastbook) }
         var index by remember {
             mutableStateOf(
-                if (state.bookmark <= book.chapters[bookmarkedChapter].list.size) state.bookmark else 0
+                if (state.bookmark <= book[bookmarkedChapter][bookmarkedSection].list.size) state.bookmark else 0
             )
         }
         var amount by remember { mutableStateOf(state.amount) }
         var bookmark by remember { mutableStateOf(state.bookmark) }
         var chapter by remember { mutableStateOf(state.chapter) }
+        var section by remember { mutableStateOf(state.section) }
 
         var textsize by remember { mutableStateOf(12) }
 
         var page by remember { mutableStateOf(index / amount) }
-        var list by remember { mutableStateOf(book[chapter].list) }
+        var list by remember { mutableStateOf(book[chapter][section].list) }
         val pagerState = rememberPagerState(page, pageCount = { list.size / amount })
-        var swipeThreshold by remember { mutableStateOf(8) }
         var debugString by remember { mutableStateOf("") }
 
         fun <T> dbp(s: T) {
@@ -161,7 +173,7 @@ class MainActivity : ComponentActivity() {
         )
 
         fun writeDataFile() {
-            state.update(lastbook, index, amount, bookmark, bookmarkedChapter)
+            state.update(lastbook, index, amount, bookmark, bookmarkedChapter, section)
             state.write()
         }
 
@@ -169,10 +181,10 @@ class MainActivity : ComponentActivity() {
             book = Book(content)
 
             index = 0
-            chapter = 2
+            chapter = 0
             bookmarkedChapter = 0
             bookmark = 0
-            list = book.chapters[chapter].list
+            list = book[chapter][section].list
         }
 
         val launcher = rememberLauncherForActivityResult(
@@ -239,10 +251,11 @@ class MainActivity : ComponentActivity() {
         }
 
         fun increaseChapter() {
-            if (chapter + 1 <= book.chapters.size) {
+            if (chapter + 1 < book.chapters.size) {
                 chapter++
                 index = 0
-                list = book.chapters[chapter].list
+                section = 0
+                list = book[chapter][section].list
                 if (amount > list.size) amount = list.size
                 shouldScroll = true
             }
@@ -252,8 +265,31 @@ class MainActivity : ComponentActivity() {
         fun decreaseChapter() {
             if (chapter > 0) {
                 chapter--
+                section = book[chapter].sections.lastIndex
+                list = book[chapter][section].list
+                index = list.size - amount
+                if (amount > list.size) amount = list.size
+                shouldScroll = true
+            }
+            writeDataFile()
+        }
+
+        fun increaseSection() {
+            if (section + 1 < book[chapter].sections.size) {
+                section++
                 index = 0
-                list = book.chapters[chapter].list
+                list = book[chapter][section].list
+                if (amount > list.size) amount = list.size
+                shouldScroll = true
+            }
+            writeDataFile()
+        }
+
+        fun decreaseSection() {
+            if (section > 0) {
+                section--
+                index = 0
+                list = book[chapter][section].list
                 if (amount > list.size) amount = list.size
                 shouldScroll = true
             }
@@ -262,12 +298,6 @@ class MainActivity : ComponentActivity() {
 
         @Composable
         fun menu() {
-            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), Arrangement.SpaceBetween) {
-                Button({ showDictionaryExplorer = !showDictionaryExplorer }, Modifier) { Icon.dictionary() }
-                Button({ showMulticolorWords = !showMulticolorWords }, Modifier) { Icon.ruby() }
-                Button({ if (chapter == bookmarkedChapter) index = bookmark }, Modifier) { Icon.bookmark() }
-            }
-
             bookfiles?.let { files ->
                 if (files.isNotEmpty()) dropdown(
                     files.map { file -> getFileName(file.toString()) },
@@ -281,7 +311,14 @@ class MainActivity : ComponentActivity() {
             }
 
             intSetting(
-                "Chapter: ${chapter}/${book.chapters.size}", { increaseChapter() }, { decreaseChapter() }, padt(8)
+                "Chapter: ${chapter + 1}/${book.chapters.size}", { increaseChapter() }, { decreaseChapter() }, padt(8)
+            )
+
+            intSetting(
+                "Section: ${section + 1}/${book[chapter].sections.size}",
+                { increaseSection() },
+                { decreaseSection() },
+                padt(8)
             )
         }
 
@@ -300,12 +337,9 @@ class MainActivity : ComponentActivity() {
                     translator = Translator(TranslateLanguage.RUSSIAN, Translator.languages[it])
                     compare = true
                 }
-
             }
+
             intSetting("text size: $textsize", { textsize++ }, { textsize-- })
-
-            if (swipe) intSetting("Swipe threshold: $swipeThreshold", { swipeThreshold++ }, { swipeThreshold-- })
-
             intSetting("Amount: $amount", { increaseAmount() }, { decreaseAmount() })
 
             switchOptionButtons()
@@ -313,7 +347,7 @@ class MainActivity : ComponentActivity() {
 
         @Composable
         fun sentenceNumber(i: Int) {
-            val bookmarked = index + i == bookmark && bookmarkedChapter == chapter
+            val bookmarked = index + i == bookmark && bookmarkedChapter == chapter && bookmarkedSection == section
 
             Row {
                 if (bookmarked) Icon.bookmark()
@@ -323,10 +357,10 @@ class MainActivity : ComponentActivity() {
                     clickable {
                         bookmark = index + i
                         bookmarkedChapter = chapter
+                        bookmarkedSection = section
                         writeDataFile()
                     },
-                    color = if (bookmarked) Colors.gold() else Colors.teal(),
-                    fontSize = 24.sp
+                    color = if (bookmarked) Colors.gold() else Colors.teal(), fontSize = 24.sp
                 )
 
                 if (bookmarked) Icon.bookmark()
@@ -336,19 +370,23 @@ class MainActivity : ComponentActivity() {
         @Composable
         fun navibuttons() = dualButton(
             (index == 0).let {
+                val x = section == 0
                 ButtonOptions(
-                    { if (it) decreaseChapter() else decreaseIndex() },
+                    { if (it && x) decreaseChapter() else if (it) decreaseSection() else decreaseIndex() },
                     if (it) Colors.gold() else Colors.dunno(), w(180)
                 ) {
-                    Text(if (it) "previous chapter" else "previous", fontSize = 16.sp)
+                    val what = if (section == 0) "chapter" else "section"
+                    Text(if (it) "previous $what" else "previous", fontSize = 16.sp)
                 }
             },
-            (index + amount > list.lastIndex).let {
+            (index + amount >= list.lastIndex).let {
+                val x = section == book[chapter].sections.lastIndex
                 ButtonOptions(
-                    { if (it) increaseChapter() else increaseIndex() },
+                    { if (it && x) increaseChapter() else if (it) increaseSection() else increaseIndex() },
                     if (it) Colors.gold() else Colors.dunno(), w(180)
                 ) {
-                    Text(if (it) "next chapter" else "next", fontSize = 16.sp)
+                    val what = if (x) "chapter" else "section"
+                    Text(if (it) "next $what" else "next", fontSize = 16.sp)
                 }
             },
             maxwidth()
@@ -356,7 +394,7 @@ class MainActivity : ComponentActivity() {
 
         @Composable
         fun pageNumber() = Text(
-            if (pageMode) "Page: ${page + 1}/${book[chapter](amount).lastIndex}"
+            if (pageMode) "Page: ${page + 1}/${book[chapter][section](amount).lastIndex}"
             else "${index + 1}-${min(list.lastIndex, index + amount)} / ${list.lastIndex}",
             padt(4), Colors.dunno(), fontSize = 42.sp,
         )
@@ -452,7 +490,7 @@ class MainActivity : ComponentActivity() {
                         shouldScroll = true
                         page = it
                         index = page * amount
-                        book[chapter](amount)[it].render()
+                        book[chapter][section](amount)[it].render()
                     } else {
                         if (showTopButtons) navibuttons()
                         list.takeFrom(index, amount).render()

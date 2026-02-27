@@ -3,49 +3,58 @@ package com.example.multilangbook
 import androidx.compose.runtime.Composable
 
 class Book(data: String) {
-    val dictionary: List<Word>
-    val chapters: List<Chapter>
-    var dbg = "\n"
+    val chapters = data.split(Sep.CHAPTERS).map { Chapter(it) }
 
     @Composable
     fun render() {
 
     }
 
-    init {
-        val content = data.split(Sep.DICTIONARY_CONTENT)
-
-        if (content.size == 2) {
-            val (dictionaryContent, bookContent) = content
-
-            dictionary = dictionaryContent.split(Sep.DICTIONARY_ENTRY).mapIndexed() { i, dictionaryEntry ->
-                val entry = dictionaryEntry
-                    .split(Sep.WORD_TRANSLATION)
-                if (entry.size == 2) {
-                    val (word, translation) = entry
-                    Word(word, translation)
-                } else {
-                    dbg += "Error splitting word and translation in parsing dictionary: (@$i) [${entry}] <${entry.size}>"
-                    Word()
-                }
-            }
-
-            chapters = bookContent.split(Sep.CHAPTER).map { Chapter(it, dictionary) }
-        } else {
-            dbg += "Probably just an invalid book file at this point"
-            dictionary = emptyList()
-            chapters = emptyList()
-        }
-    }
-
     operator fun get(index: Int) = chapters[index]
 
     class Sep {
         companion object {
-            const val WORD_TRANSLATION = '\u0000'
-            const val DICTIONARY_ENTRY = '\u0001'
-            const val DICTIONARY_CONTENT = '\u0002'
-            const val CHAPTER = '\u0003'
+            const val CHAPTERS = '\u0000'
+        }
+    }
+}
+
+class Chapter(data: String) {
+    val nameAndContent = data.split(Sep.NAME_CONTENT)
+    val name = nameAndContent.first()
+    val content = nameAndContent.last()
+    val sections = content.split(Sep.SECTIONS).map { Section(it) }
+
+    operator fun get(i: Int) = sections[i]
+
+    class Sep {
+        companion object {
+            const val NAME_CONTENT = '\u0001'
+            const val SECTIONS = '\u0002'
+        }
+    }
+}
+
+class Section(data: String) {
+    val nameAndContent = data.split(Sep.NAME_CONTENT)
+    val name = nameAndContent.first()
+    val content = nameAndContent.last()
+    val list = content.split(Sep.RUBY).map {
+        val (words, translation) = it.split(Sep.WORDS_TRANSLATION)
+        Ruby(words.split(Sep.WORDS_AND_TRANSLATIONS).map {
+            it.split(Sep.WORD_AND_TRANSLATION).let { Word(it.first(), it.last()) }
+        }, translation)
+    }
+
+    operator fun invoke(amount: Int) = list.chunked(amount)
+
+    class Sep {
+        companion object {
+            const val NAME_CONTENT = '\u0003'
+            const val RUBY = '\u0004'
+            const val WORDS_AND_TRANSLATIONS = '\u0005'
+            const val WORD_AND_TRANSLATION = '\u0006'
+            const val WORDS_TRANSLATION = '\u0007'
         }
     }
 }
@@ -69,34 +78,4 @@ class Bookmark(val index: Int, val chapter: Int) {
 
     operator fun component1() = index
     operator fun component2() = chapter
-}
-
-class Chapter(data: String, dictionary: List<Word>) {
-    @Composable
-    fun render() {
-
-    }
-
-    val list: List<Ruby> = data.split(Sep.RUBY).map { ruby ->
-        val wordIndicesSentence = ruby.split(Sep.WORDINDICES_SENTENCE)
-
-        if (wordIndicesSentence.size == 2) {
-            val (wordIndices, sentence) = wordIndicesSentence
-            val words = wordIndices.split(Sep.WORD_INDEX).map { dictionary[it.toInt()] }
-
-            Ruby(words, sentence)
-        } else {
-            Ruby()
-        }
-    }
-
-    operator fun invoke(amount: Int) = list.chunked(amount)
-
-    class Sep {
-        companion object {
-            const val WORD_INDEX = '\u0004'
-            const val WORDINDICES_SENTENCE = '\u0005'
-            const val RUBY = '\u0006'
-        }
-    }
 }
